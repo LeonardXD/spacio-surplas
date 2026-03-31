@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import MaterialIcon from '../components/MaterialIcon'
 
-function Navbar({ onLoginClick, onSignupClick }) {
+function Navbar({ onHomeClick, onLoginClick, onSignupClick }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const navLinks = ['Home', 'Browse Furniture', 'Sellers', 'About']
 
@@ -9,7 +9,7 @@ function Navbar({ onLoginClick, onSignupClick }) {
     <header className="sticky top-0 z-50 w-full border-b border-primary/10 bg-white/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-10">
-          <a className="flex items-center gap-2" href="#">
+          <button className="flex cursor-pointer items-center gap-2" onClick={onHomeClick} type="button">
             <img
               alt="Spacio Surplas Logo"
               className="h-10 w-auto rounded-md border border-primary/40 bg-white p-1"
@@ -18,7 +18,7 @@ function Navbar({ onLoginClick, onSignupClick }) {
             <span className="text-xl font-extrabold tracking-tight text-neutral-dark">
               SPACIO <span className="text-primary">SURPLAS</span>
             </span>
-          </a>
+          </button>
 
           <nav className="hidden space-x-8 lg:flex">
             {navLinks.map((link) => (

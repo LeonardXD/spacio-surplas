@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import MaterialIcon from '../components/MaterialIcon'
 
 const USERS_STORAGE_KEY = 'spacio_surplas_users'
@@ -27,7 +27,7 @@ function getStoredSession() {
   }
 }
 
-function AuthSection({ initialMode = 'login', onBackHome }) {
+function AuthSection({ initialMode = 'login', onModeChange }) {
   const [mode, setMode] = useState(initialMode)
   const [users, setUsers] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
@@ -48,8 +48,6 @@ function AuthSection({ initialMode = 'login', onBackHome }) {
     setUsers(getStoredUsers())
     setCurrentUser(getStoredSession())
   }, [])
-
-  const registeredUserCount = useMemo(() => users.length, [users.length])
 
   function saveUsers(nextUsers) {
     setUsers(nextUsers)
@@ -78,6 +76,11 @@ function AuthSection({ initialMode = 'login', onBackHome }) {
 
   function showSuccess(message) {
     setFeedback({ kind: 'success', message })
+  }
+
+  function handleModeSwitch(nextMode) {
+    setMode(nextMode)
+    onModeChange?.(nextMode)
   }
 
   function handleRegister(event) {
@@ -112,7 +115,7 @@ function AuthSection({ initialMode = 'login', onBackHome }) {
     const hasExistingUser = users.some((user) => user.email.toLowerCase() === email)
     if (hasExistingUser) {
       showError('That email is already registered. Please log in instead.')
-      setMode('login')
+      handleModeSwitch('login')
       return
     }
 
@@ -128,7 +131,7 @@ function AuthSection({ initialMode = 'login', onBackHome }) {
     saveUsers(nextUsers)
     showSuccess('Registration successful. You can now log in.')
     setRegisterForm({ fullName: '', email: '', password: '', confirmPassword: '' })
-    setMode('login')
+    handleModeSwitch('login')
   }
 
   function handleLogin(event) {
@@ -166,56 +169,14 @@ function AuthSection({ initialMode = 'login', onBackHome }) {
           backgroundSize: '36px 36px',
         }}
       />
-      <div className="relative mx-auto grid w-full max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
-        <div className="rounded-3xl bg-neutral-dark p-8 text-white shadow-xl shadow-neutral-dark/20 lg:p-10">
-          <a className="inline-flex items-center gap-2" href="#">
-            <img
-              alt="Spacio Surplas Logo"
-              className="h-10 w-auto rounded-md border border-primary/40 bg-white p-1"
-              src="/logo.svg"
-            />
-            <span className="text-xl font-extrabold tracking-tight text-white">
-              SPACIO <span className="text-primary">SURPLAS</span>
-            </span>
-          </a>
-          <h1 className="mt-10 text-4xl font-black leading-tight tracking-tight">
-            Your account for seamless furniture deals.
-          </h1>
-          <p className="mt-5 max-w-md text-white/70">
-            Register to keep your profile ready, or log in using your registered details.
-            Registration data is persisted in local storage for this browser.
-          </p>
-
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            <div className="rounded-xl border border-primary/40 bg-primary/20 px-4 py-3">
-              <p className="text-xs uppercase tracking-widest text-white/70">Registered Accounts</p>
-              <p className="text-2xl font-black">{registeredUserCount}</p>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-white/5 px-4 py-3">
-              <p className="text-xs uppercase tracking-widest text-white/70">Session Status</p>
-              <p className="text-sm font-semibold">
-                {currentUser ? `Logged in as ${currentUser.fullName}` : 'Not logged in'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            className="mt-10 inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/15 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/25"
-            onClick={onBackHome}
-            type="button"
-          >
-            <MaterialIcon className="text-base" name="arrow_back" />
-            Back to Home
-          </button>
-        </div>
-
+      <div className="relative mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8">
         <div className="rounded-3xl border border-primary/15 bg-white p-6 shadow-xl shadow-primary/10 sm:p-8">
           <div className="inline-flex w-full rounded-xl border border-primary/20 bg-background-light p-1">
             <button
               className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
                 mode === 'login' ? 'bg-neutral-dark text-white' : 'text-neutral-dark'
               }`}
-              onClick={() => setMode('login')}
+              onClick={() => handleModeSwitch('login')}
               type="button"
             >
               Login
@@ -224,7 +185,7 @@ function AuthSection({ initialMode = 'login', onBackHome }) {
               className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
                 mode === 'register' ? 'bg-neutral-dark text-white' : 'text-neutral-dark'
               }`}
-              onClick={() => setMode('register')}
+              onClick={() => handleModeSwitch('register')}
               type="button"
             >
               Register
