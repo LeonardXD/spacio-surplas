@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import MaterialIcon from '../components/MaterialIcon'
 
-function Navbar() {
+function Navbar({ onLoginClick, onSignupClick }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const navLinks = ['Home', 'Browse Furniture', 'Sellers', 'About']
 
@@ -42,10 +42,18 @@ function Navbar() {
             />
           </div>
           <div className="hidden items-center gap-3 lg:flex">
-            <a className="text-sm font-bold text-neutral-dark" href="#">
+            <button
+              className="cursor-pointer text-sm font-bold text-neutral-dark"
+              onClick={onLoginClick}
+              type="button"
+            >
               Login
-            </a>
-            <button className="rounded-lg bg-neutral-dark px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-neutral-dark/90">
+            </button>
+            <button
+              className="rounded-lg bg-neutral-dark px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-neutral-dark/90"
+              onClick={onSignupClick}
+              type="button"
+            >
               Sign Up
             </button>
           </div>
@@ -90,14 +98,24 @@ function Navbar() {
             </nav>
 
             <div className="flex items-center gap-3 border-t border-primary/10 pt-3">
-              <a
+              <button
                 className="rounded-lg px-3 py-2 text-sm font-bold text-neutral-dark hover:bg-primary/5"
-                href="#"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={() => {
+                  onLoginClick()
+                  setIsMenuOpen(false)
+                }}
+                type="button"
               >
                 Login
-              </a>
-              <button className="rounded-lg bg-neutral-dark px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-neutral-dark/90">
+              </button>
+              <button
+                className="rounded-lg bg-neutral-dark px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-neutral-dark/90"
+                onClick={() => {
+                  onSignupClick()
+                  setIsMenuOpen(false)
+                }}
+                type="button"
+              >
                 Sign Up
               </button>
             </div>
