@@ -21,6 +21,7 @@ import SellerAddListingSection from './sections/SellerAddListingSection'
 import SellerDashboardSection from './sections/SellerDashboardSection'
 import SellerInventorySection from './sections/SellerInventorySection'
 import SellerSidebarLayout from './sections/SellerSidebarLayout'
+import VirtualRoomPlannerSection from './sections/VirtualRoomPlannerSection'
 
 const SELLER_LISTINGS_STORAGE_KEY = 'spacio_surplas_seller_listings'
 const ORDERS_STORAGE_KEY = 'spacio_surplas_orders'
@@ -56,6 +57,10 @@ function getRouteFromPath(pathname) {
 
   if (pathname === '/browse') {
     return { view: 'browse', authMode: 'login', authRole: 'buyer' }
+  }
+
+  if (pathname === '/planner') {
+    return { view: 'planner', authMode: 'login', authRole: 'buyer' }
   }
 
   if (pathname === '/cart') {
@@ -104,6 +109,10 @@ function getPathFromRoute(view, authMode, authRole = 'buyer') {
 
   if (view === 'browse') {
     return '/browse'
+  }
+
+  if (view === 'planner') {
+    return '/planner'
   }
 
   if (view === 'cart') {
@@ -321,6 +330,10 @@ function isViewAllowed(view, user) {
   }
 
   if (view === 'browse') {
+    return role === 'buyer'
+  }
+
+  if (view === 'planner') {
     return role === 'buyer'
   }
 
@@ -1053,6 +1066,10 @@ function App() {
           products={marketplaceProducts}
         />
       )
+    }
+
+    if (resolvedView === 'planner') {
+      return <VirtualRoomPlannerSection />
     }
 
     if (resolvedView === 'cart') {

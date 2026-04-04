@@ -16,6 +16,7 @@ function getNavLinks(role) {
     return [
       { label: 'Home', view: 'home' },
       { label: 'Browse Furniture', view: 'browse' },
+      { label: 'Room Planner', view: 'planner' },
       { label: 'Cart', view: 'cart' },
       { label: 'My Orders', view: 'orders' },
       { label: 'About', view: 'about' },
