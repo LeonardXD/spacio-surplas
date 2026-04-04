@@ -1,6 +1,6 @@
 import MaterialIcon from '../components/MaterialIcon'
 
-function HeroSection() {
+function HeroSection({ onFindFurniture }) {
   return (
     <section className="relative overflow-hidden bg-background-light py-20 lg:py-32">
       <div
@@ -33,7 +33,7 @@ function HeroSection() {
                   />
                   <input
                     className="w-full rounded-lg border border-primary/10 bg-primary/5 py-3 pl-10 focus:border-primary focus:outline-none"
-                    placeholder="e.g. 12 ft"
+                    placeholder="e.g. 3.7 m"
                     type="text"
                   />
                 </div>
@@ -50,7 +50,7 @@ function HeroSection() {
                   />
                   <input
                     className="w-full rounded-lg border border-primary/10 bg-primary/5 py-3 pl-10 focus:border-primary focus:outline-none"
-                    placeholder="e.g. 15 ft"
+                    placeholder="e.g. 4.6 m"
                     type="text"
                   />
                 </div>
@@ -69,7 +69,11 @@ function HeroSection() {
               </div>
 
               <div className="flex items-end">
-                <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3.5 text-base font-bold text-neutral-dark transition-all hover:bg-primary/90">
+                <button
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-3.5 text-base font-bold text-neutral-dark transition-all hover:bg-primary/90"
+                  onClick={onFindFurniture}
+                  type="button"
+                >
                   <MaterialIcon name="search" />
                   Find Furniture
                 </button>

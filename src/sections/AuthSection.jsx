@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import MaterialIcon from '../components/MaterialIcon'
+import { sellerPlans } from '../data/homePageData'
 
 const USERS_STORAGE_KEY = 'spacio_surplas_users'
 const SESSION_STORAGE_KEY = 'spacio_surplas_current_user'
@@ -18,56 +19,37 @@ function getStoredUsers() {
   }
 }
 
-function getStoredSession() {
-  try {
-    const rawSession = localStorage.getItem(SESSION_STORAGE_KEY)
-    return rawSession ? JSON.parse(rawSession) : null
-  } catch {
-    return null
-  }
+function formatPlanPrice(pricePerMonth) {
+  return `PHP ${pricePerMonth.toLocaleString('en-PH')}/month`
 }
 
-function AuthSection({ initialMode = 'login', onModeChange }) {
-  const [mode, setMode] = useState(initialMode)
-  const [users, setUsers] = useState([])
-  const [currentUser, setCurrentUser] = useState(null)
+function getRoleLabel(role) {
+  return role === 'seller' ? 'Seller' : 'Buyer'
+}
+
+function AuthSection({
+  initialMode = 'login',
+  accountRole = 'buyer',
+  onModeChange,
+  onAuthSuccess,
+}) {
+  const [users, setUsers] = useState(() => getStoredUsers())
   const [loginForm, setLoginForm] = useState({ email: '', password: '' })
   const [registerForm, setRegisterForm] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    businessName: '',
   })
+  const [selectedPlanId, setSelectedPlanId] = useState(sellerPlans[0]?.id ?? 'starter')
   const [feedback, setFeedback] = useState({ kind: '', message: '' })
-
-  useEffect(() => {
-    setMode(initialMode)
-  }, [initialMode])
-
-  useEffect(() => {
-    setUsers(getStoredUsers())
-    setCurrentUser(getStoredSession())
-  }, [])
+  const role = accountRole
+  const mode = initialMode
 
   function saveUsers(nextUsers) {
     setUsers(nextUsers)
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers))
-  }
-
-  function updateSession(user) {
-    const sessionUser = {
-      fullName: user.fullName,
-      email: user.email,
-      loggedInAt: new Date().toISOString(),
-    }
-    setCurrentUser(sessionUser)
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser))
-  }
-
-  function clearSession() {
-    setCurrentUser(null)
-    localStorage.removeItem(SESSION_STORAGE_KEY)
-    setFeedback({ kind: 'success', message: 'You have been logged out.' })
   }
 
   function showError(message) {
@@ -78,22 +60,23 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
     setFeedback({ kind: 'success', message })
   }
 
-  function handleModeSwitch(nextMode) {
-    setMode(nextMode)
-    onModeChange?.(nextMode)
-  }
-
   function handleRegister(event) {
     event.preventDefault()
     setFeedback({ kind: '', message: '' })
 
     const fullName = registerForm.fullName.trim()
+    const businessName = registerForm.businessName.trim()
     const email = registerForm.email.trim().toLowerCase()
     const password = registerForm.password
     const confirmPassword = registerForm.confirmPassword
 
     if (!fullName || !email || !password || !confirmPassword) {
-      showError('Please complete all registration fields.')
+      showError('Please complete all required registration fields.')
+      return
+    }
+
+    if (role === 'seller' && !businessName) {
+      showError('Seller registration requires a business/shop name.')
       return
     }
 
@@ -112,26 +95,49 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
       return
     }
 
-    const hasExistingUser = users.some((user) => user.email.toLowerCase() === email)
-    if (hasExistingUser) {
-      showError('That email is already registered. Please log in instead.')
-      handleModeSwitch('login')
+    const hasExistingRoleAccount = users.some(
+      (user) =>
+        user.email.toLowerCase() === email && (user.role ?? 'buyer') === role,
+    )
+
+    if (hasExistingRoleAccount) {
+      showError(`This ${getRoleLabel(role).toLowerCase()} email is already registered. Please log in.`)
+      onModeChange?.('login')
       return
     }
+
+    const selectedPlan = sellerPlans.find((plan) => plan.id === selectedPlanId) ?? sellerPlans[0]
 
     const newUser = {
       id: Date.now(),
       fullName,
       email,
       password,
+      role,
+      businessName: role === 'seller' ? businessName : '',
+      sellerPlanId: role === 'seller' ? selectedPlan.id : null,
       createdAt: new Date().toISOString(),
     }
 
     const nextUsers = [...users, newUser]
     saveUsers(nextUsers)
-    showSuccess('Registration successful. You can now log in.')
-    setRegisterForm({ fullName: '', email: '', password: '', confirmPassword: '' })
-    handleModeSwitch('login')
+
+    if (role === 'seller') {
+      showSuccess(
+        `Seller account created with ${selectedPlan.name} plan (${selectedPlan.freeTrialDays}-day free trial). You can now log in.`,
+      )
+    } else {
+      showSuccess('Buyer account created successfully. You can now log in.')
+    }
+
+    setRegisterForm({
+      fullName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      businessName: '',
+    })
+    onModeChange?.('login')
   }
 
   function handleLogin(event) {
@@ -147,18 +153,44 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
     }
 
     const matchedUser = users.find(
-      (user) => user.email.toLowerCase() === email && user.password === password,
+      (user) =>
+        user.email.toLowerCase() === email &&
+        user.password === password &&
+        (user.role ?? 'buyer') === role,
     )
 
     if (!matchedUser) {
-      showError('Incorrect email or password.')
+      const roleMismatchUser = users.find(
+        (user) => user.email.toLowerCase() === email && user.password === password,
+      )
+
+      if (roleMismatchUser) {
+        const expectedRole = getRoleLabel(roleMismatchUser.role ?? 'buyer')
+        showError(`This account is registered as ${expectedRole}. Use the ${expectedRole.toLowerCase()} login page.`)
+        return
+      }
+
+      showError('Incorrect credentials for this role.')
       return
     }
 
-    updateSession(matchedUser)
+    const sessionUser = {
+      id: matchedUser.id,
+      fullName: matchedUser.fullName,
+      email: matchedUser.email,
+      role: matchedUser.role ?? 'buyer',
+      businessName: matchedUser.businessName ?? '',
+      sellerPlanId: matchedUser.sellerPlanId ?? null,
+      loggedInAt: new Date().toISOString(),
+    }
+
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionUser))
     setLoginForm({ email: '', password: '' })
     showSuccess(`Welcome back, ${matchedUser.fullName}.`)
+    onAuthSuccess?.(sessionUser)
   }
+
+  const activePlan = sellerPlans.find((plan) => plan.id === selectedPlanId) ?? sellerPlans[0]
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-background-light py-20">
@@ -169,27 +201,25 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
           backgroundSize: '36px 36px',
         }}
       />
-      <div className="relative mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8">
         <div className="rounded-3xl border border-primary/15 bg-white p-6 shadow-xl shadow-primary/10 sm:p-8">
-          <div className="inline-flex w-full rounded-xl border border-primary/20 bg-background-light p-1">
-            <button
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
-                mode === 'login' ? 'bg-neutral-dark text-white' : 'text-neutral-dark'
-              }`}
-              onClick={() => handleModeSwitch('login')}
-              type="button"
-            >
-              Login
-            </button>
-            <button
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
-                mode === 'register' ? 'bg-neutral-dark text-white' : 'text-neutral-dark'
-              }`}
-              onClick={() => handleModeSwitch('register')}
-              type="button"
-            >
-              Register
-            </button>
+          <div>
+            <h2 className="text-2xl font-black text-neutral-dark sm:text-3xl">
+              {mode === 'login'
+                ? `${getRoleLabel(role)} Login`
+                : `${getRoleLabel(role)} Registration`}
+            </h2>
+            <p className="mt-2 text-sm text-neutral-dark/65">
+              {mode === 'login'
+                ? `Sign in to your ${getRoleLabel(role).toLowerCase()} account.`
+                : `Create your ${getRoleLabel(role).toLowerCase()} account.`}
+            </p>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2">
+            <p className="text-center text-sm font-bold text-neutral-dark">
+              {getRoleLabel(role)} Account
+            </p>
           </div>
 
           {feedback.message && (
@@ -204,11 +234,49 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
             </div>
           )}
 
+          {mode === 'register' && role === 'seller' && (
+            <div className="mt-6 rounded-2xl border border-primary/15 bg-background-light p-4 sm:p-5">
+              <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-neutral-dark/70">
+                <MaterialIcon className="text-base text-primary" name="workspace_premium" />
+                Seller Plans With Free Trial
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                {sellerPlans.map((plan) => (
+                  <button
+                    key={plan.id}
+                    className={`rounded-xl border p-4 text-left transition-colors ${
+                      selectedPlanId === plan.id
+                        ? 'border-neutral-dark bg-neutral-dark text-white'
+                        : 'border-primary/20 bg-white text-neutral-dark hover:border-primary/40'
+                    }`}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    type="button"
+                  >
+                    <p className="text-xs font-bold uppercase tracking-wider text-primary">{plan.name}</p>
+                    <p className="mt-1 text-lg font-black">{formatPlanPrice(plan.pricePerMonth)}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide">
+                      {plan.freeTrialDays}-day free trial
+                    </p>
+                  </button>
+                ))}
+              </div>
+
+              {activePlan && (
+                <ul className="mt-4 grid list-disc gap-1 pl-5 text-sm text-neutral-dark/80 md:grid-cols-3">
+                  {activePlan.features.map((feature) => (
+                    <li key={feature}>{feature}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           {mode === 'login' ? (
             <form className="mt-6 space-y-5" onSubmit={handleLogin}>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-neutral-dark" htmlFor="login-email">
-                  Email
+                  {getRoleLabel(role)} Email
                 </label>
                 <input
                   autoComplete="email"
@@ -242,7 +310,15 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
                 type="submit"
               >
                 <MaterialIcon className="text-base" name="login" />
-                Login
+                Login as {getRoleLabel(role)}
+              </button>
+
+              <button
+                className="w-full rounded-lg border border-primary/20 px-4 py-3 text-sm font-semibold text-neutral-dark transition-colors hover:bg-primary/5"
+                onClick={() => onModeChange?.('register')}
+                type="button"
+              >
+                Need an account? Register as {getRoleLabel(role)}
               </button>
             </form>
           ) : (
@@ -263,6 +339,25 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
                   value={registerForm.fullName}
                 />
               </div>
+
+              {role === 'seller' && (
+                <div>
+                  <label className="mb-1 block text-sm font-semibold text-neutral-dark" htmlFor="register-business-name">
+                    Shop / Business Name
+                  </label>
+                  <input
+                    className="w-full rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 focus:border-primary focus:outline-none"
+                    id="register-business-name"
+                    onChange={(event) =>
+                      setRegisterForm((prev) => ({ ...prev, businessName: event.target.value }))
+                    }
+                    placeholder="Modern Surplus Studio"
+                    type="text"
+                    value={registerForm.businessName}
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-sm font-semibold text-neutral-dark" htmlFor="register-email">
                   Email
@@ -320,19 +415,17 @@ function AuthSection({ initialMode = 'login', onModeChange }) {
                 type="submit"
               >
                 <MaterialIcon className="text-base" name="person_add" />
-                Create Account
+                Create {getRoleLabel(role)} Account
+              </button>
+
+              <button
+                className="w-full rounded-lg border border-primary/20 px-4 py-3 text-sm font-semibold text-neutral-dark transition-colors hover:bg-primary/5"
+                onClick={() => onModeChange?.('login')}
+                type="button"
+              >
+                Already have an account? Login as {getRoleLabel(role)}
               </button>
             </form>
-          )}
-
-          {currentUser && (
-            <button
-              className="mt-6 w-full rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-neutral-dark transition-colors hover:bg-primary/10"
-              onClick={clearSession}
-              type="button"
-            >
-              Logout
-            </button>
           )}
         </div>
       </div>

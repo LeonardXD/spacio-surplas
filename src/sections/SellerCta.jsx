@@ -1,4 +1,4 @@
-function SellerCta() {
+function SellerCta({ onBecomeSeller }) {
   return (
     <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6 lg:px-8">
       <div className="relative overflow-hidden rounded-[2rem] bg-neutral-dark px-8 py-16 text-center text-white lg:py-24">
@@ -15,7 +15,11 @@ function SellerCta() {
             Join hundreds of sellers reaching customers who need exactly what you have. Fast,
             secure, and easy listing.
           </p>
-          <button className="mt-10 rounded-xl bg-primary px-8 py-4 text-lg font-bold text-neutral-dark transition-all hover:scale-105 hover:bg-primary/90">
+          <button
+            className="mt-10 rounded-xl bg-primary px-8 py-4 text-lg font-bold text-neutral-dark transition-all hover:scale-105 hover:bg-primary/90"
+            onClick={onBecomeSeller}
+            type="button"
+          >
             Become a Seller
           </button>
         </div>
