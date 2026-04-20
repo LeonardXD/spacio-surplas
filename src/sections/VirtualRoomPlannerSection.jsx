@@ -93,8 +93,10 @@ function VirtualRoomPlannerSection({ products = [] }) {
   const furnitureGroupRef = useRef(null)
   const floorMeshRef = useRef(null)
   const roomDimensionsRef = useRef(null)
+  const wallsRef = useRef([]) // Store walls to hide/show them based on camera
   const selectedFurnitureIdRef = useRef(null)
   const rotateSelectedFurnitureRef = useRef(() => {})
+  const removeSelectedFurnitureRef = useRef(() => {})
   const updateFitIndicatorsRef = useRef(() => {})
   const draggingRef = useRef({
     isDragging: false,
@@ -185,13 +187,10 @@ function VirtualRoomPlannerSection({ products = [] }) {
     }
 
     const bounds = new THREE.Box3().setFromObject(entry.object)
-    const size = new THREE.Vector3()
-    bounds.getSize(size)
-
-    const halfWidth = size.x / 2
-    const halfLength = size.z / 2
-    const fitsByWidth = Math.abs(entry.object.position.x) + halfWidth <= roomDimensions.width / 2 + EPSILON
-    const fitsByLength = Math.abs(entry.object.position.z) + halfLength <= roomDimensions.length / 2 + EPSILON
+    const roomHalfWidth = roomDimensions.width / 2
+    const roomHalfLength = roomDimensions.length / 2
+    const fitsByWidth = bounds.min.x >= -roomHalfWidth - EPSILON && bounds.max.x <= roomHalfWidth + EPSILON
+    const fitsByLength = bounds.min.z >= -roomHalfLength - EPSILON && bounds.max.z <= roomHalfLength + EPSILON
     const fitsByHeight = bounds.max.y <= roomDimensions.height + EPSILON
 
     return fitsByWidth && fitsByLength && fitsByHeight
@@ -252,6 +251,85 @@ function VirtualRoomPlannerSection({ products = [] }) {
     setFitWarning('')
   }
 
+  function createWoodTexture() {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 512
+    const context = canvas.getContext('2d')
+
+    // Base wood color
+    context.fillStyle = '#bc9b70'
+    context.fillRect(0, 0, 512, 512)
+
+    // Draw planks
+    const plankHeight = 64
+    for (let y = 0; y < 512; y += plankHeight) {
+      // Variation in plank color
+      const brightness = Math.random() * 20 - 10
+      context.fillStyle = `rgb(${188 + brightness}, ${155 + brightness}, ${112 + brightness})`
+      context.fillRect(0, y, 512, plankHeight)
+
+      // Grain/lines
+      context.strokeStyle = 'rgba(0,0,0,0.1)'
+      context.lineWidth = 1
+      for (let i = 0; i < 15; i++) {
+        context.beginPath()
+        const startX = Math.random() * 512
+        const startY = y + Math.random() * plankHeight
+        context.moveTo(startX, startY)
+        context.lineTo(startX + Math.random() * 200, startY + (Math.random() - 0.5) * 10)
+        context.stroke()
+      }
+
+      // Plank borders
+      context.strokeStyle = 'rgba(0,0,0,0.15)'
+      context.lineWidth = 2
+      context.strokeRect(0, y, 512, plankHeight)
+    }
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    return texture
+  }
+
+  function createPlasterTexture() {
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 512
+    const context = canvas.getContext('2d')
+
+    // Base wall color (Warm Eggshell)
+    context.fillStyle = '#f4f1ea'
+    context.fillRect(0, 0, 512, 512)
+
+    // Subtle plaster grain
+    for (let i = 0; i < 15000; i++) {
+      const x = Math.random() * 512
+      const y = Math.random() * 512
+      const size = Math.random() * 1.5
+      const alpha = Math.random() * 0.08
+      context.fillStyle = `rgba(0,0,0,${alpha})`
+      context.fillRect(x, y, size, size)
+    }
+
+    // Add some "roller" texture marks
+    context.strokeStyle = 'rgba(0,0,0,0.02)'
+    for (let i = 0; i < 20; i++) {
+      context.beginPath()
+      context.lineWidth = 40
+      const x = Math.random() * 512
+      context.moveTo(x, 0)
+      context.lineTo(x + (Math.random() - 0.5) * 50, 512)
+      context.stroke()
+    }
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.wrapS = THREE.RepeatWrapping
+    texture.wrapT = THREE.RepeatWrapping
+    return texture
+  }
+
   function createRoom(width, length, height) {
     const roomGroup = roomGroupRef.current
     const camera = cameraRef.current
@@ -262,8 +340,16 @@ function VirtualRoomPlannerSection({ products = [] }) {
     }
 
     clearRoomMeshes()
+    wallsRef.current = [] // Reset wall tracking
 
-    const floorMaterial = new THREE.MeshStandardMaterial({ color: '#efe9df', roughness: 0.92 })
+    // Floor with wood texture
+    const woodTexture = createWoodTexture()
+    woodTexture.repeat.set(width / 1.5, length / 1.5) // Adjust scale
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      map: woodTexture,
+      roughness: 0.7,
+      metalness: 0.1,
+    })
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(width, length), floorMaterial)
     floor.rotation.x = -Math.PI / 2
     floor.receiveShadow = true
@@ -271,39 +357,72 @@ function VirtualRoomPlannerSection({ products = [] }) {
     roomGroup.add(floor)
     floorMeshRef.current = floor
 
+    // Walls with plaster texture
+    const plasterTexture = createPlasterTexture()
     const wallMaterial = new THREE.MeshStandardMaterial({
+      map: plasterTexture,
       color: '#ffffff',
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.95,
-      roughness: 0.8,
+      side: THREE.FrontSide, // Only visible from the front (inside)
+      roughness: 0.95,
     })
 
-    const northWall = new THREE.Mesh(new THREE.PlaneGeometry(width, height), wallMaterial.clone())
-    northWall.position.set(0, height / 2, -length / 2)
-    roomGroup.add(northWall)
+    // Helper to add wall and baseboard
+    const addWallWithBaseboard = (w, h, pos, rotY, inwardNormal, hasWindow = false) => {
+      const wallGroup = new THREE.Group()
+      wallGroup.position.copy(pos)
+      wallGroup.rotation.y = rotY
+      wallGroup.userData.inwardNormal = inwardNormal
 
-    const southWall = new THREE.Mesh(new THREE.PlaneGeometry(width, height), wallMaterial.clone())
-    southWall.position.set(0, height / 2, length / 2)
-    southWall.rotation.y = Math.PI
-    roomGroup.add(southWall)
+      const wall = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMaterial.clone())
+      wall.position.y = h / 2
+      wall.receiveShadow = true
+      wallGroup.add(wall)
 
-    const eastWall = new THREE.Mesh(new THREE.PlaneGeometry(length, height), wallMaterial.clone())
-    eastWall.position.set(width / 2, height / 2, 0)
-    eastWall.rotation.y = -Math.PI / 2
-    roomGroup.add(eastWall)
+      // Add a "Window Light" effect if requested
+      if (hasWindow) {
+        const windowGlow = new THREE.Mesh(
+          new THREE.PlaneGeometry(w * 0.4, h * 0.5),
+          new THREE.MeshBasicMaterial({
+            color: '#ffffff',
+            transparent: true,
+            opacity: 0.15,
+          })
+        )
+        windowGlow.position.set(0, h * 0.55, 0.01)
+        wallGroup.add(windowGlow)
+      }
 
-    const westWall = new THREE.Mesh(new THREE.PlaneGeometry(length, height), wallMaterial.clone())
-    westWall.position.set(-width / 2, height / 2, 0)
-    westWall.rotation.y = Math.PI / 2
-    roomGroup.add(westWall)
+      // Add baseboard (skirting)
+      const baseboardHeight = 0.12
+      const baseboardDepth = 0.03
+      const baseboardMaterial = new THREE.MeshStandardMaterial({ color: '#fcfcfc', roughness: 0.4 })
+      const baseboard = new THREE.Mesh(
+        new THREE.BoxGeometry(w, baseboardHeight, baseboardDepth),
+        baseboardMaterial
+      )
+      baseboard.position.y = baseboardHeight / 2
+      baseboard.position.z = baseboardDepth / 2 + 0.005
+      baseboard.castShadow = true
+      baseboard.receiveShadow = true
+      wallGroup.add(baseboard)
+
+      roomGroup.add(wallGroup)
+      wallsRef.current.push(wallGroup)
+    }
+
+    // Create 4 walls, one with a "light window" effect
+    addWallWithBaseboard(width, height, new THREE.Vector3(0, 0, -length / 2), 0, new THREE.Vector3(0, 0, 1), true)
+    addWallWithBaseboard(width, height, new THREE.Vector3(0, 0, length / 2), Math.PI, new THREE.Vector3(0, 0, -1))
+    addWallWithBaseboard(length, height, new THREE.Vector3(width / 2, 0, 0), -Math.PI / 2, new THREE.Vector3(-1, 0, 0))
+    addWallWithBaseboard(length, height, new THREE.Vector3(-width / 2, 0, 0), Math.PI / 2, new THREE.Vector3(1, 0, 0))
 
     const gridSize = Math.max(width, length)
     const gridDivisions = Math.max(8, Math.round(gridSize * 2))
-    const grid = new THREE.GridHelper(gridSize, gridDivisions, 0x9ca3af, 0xd1d5db)
-    grid.position.y = 0.01
+    const grid = new THREE.GridHelper(gridSize, gridDivisions, 0x000000, 0x000000)
+    grid.position.y = 0.005
+    grid.material.transparent = true
+    grid.material.opacity = 0.08 // Much subtler grid
     roomGroup.add(grid)
-
     controls.target.set(0, height * 0.35, 0)
     camera.position.set(width * 1.2, height * 1.15, length * 1.2)
     controls.update()
@@ -508,6 +627,7 @@ function VirtualRoomPlannerSection({ products = [] }) {
   }
 
   rotateSelectedFurnitureRef.current = rotateSelectedFurniture
+  removeSelectedFurnitureRef.current = removeSelectedFurniture
   updateFitIndicatorsRef.current = updateFitIndicators
 
   useEffect(() => {
@@ -669,14 +789,35 @@ function VirtualRoomPlannerSection({ products = [] }) {
     }
 
     const handleKeydown = (event) => {
-      if (event.key.toLowerCase() === 'r') {
+      const key = event.key.toLowerCase()
+      if (key === 'r') {
         rotateSelectedFurnitureRef.current()
+      } else if (key === 'd') {
+        removeSelectedFurnitureRef.current()
       }
     }
 
     const animate = () => {
       animationFrameRef.current = window.requestAnimationFrame(animate)
       controls.update()
+
+      // Wall visibility logic
+      if (camera && wallsRef.current.length > 0) {
+        const cameraDirection = new THREE.Vector3()
+        camera.getWorldDirection(cameraDirection)
+
+        wallsRef.current.forEach((wallGroup) => {
+          if (!wallGroup.userData.inwardNormal) {
+            return
+          }
+
+          // Dot product between camera direction and wall inward normal
+          // If dot > 0.1, the camera is looking roughly in the same direction as the normal (from outside looking in)
+          const dot = cameraDirection.dot(wallGroup.userData.inwardNormal)
+          wallGroup.visible = dot > -0.2 // Show if looking from inside or slightly from side
+        })
+      }
+
       renderer.render(scene, camera)
     }
     animate()
@@ -846,7 +987,7 @@ function VirtualRoomPlannerSection({ products = [] }) {
                       type="button"
                     >
                       <MaterialIcon className="text-sm" name="delete" />
-                      Remove
+                      Remove (D)
                     </button>
                   </div>
                 </div>
