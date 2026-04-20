@@ -4,45 +4,18 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import MaterialIcon from '../components/MaterialIcon'
 
+import bedImg from '../assets/Bed.png'
+import chairImg from '../assets/Chair.png'
+import drawerImg from '../assets/Drawer.png'
+import sofaImg from '../assets/Sofa.png'
+import bedModel from '../assets/Bed.glb'
+import chairModel from '../assets/Chair.glb'
+import drawerModel from '../assets/Drawer.glb'
+import sofaModel from '../assets/Sofa.glb'
+
 const DEFAULT_ROOM_HEIGHT_METERS = 2.8
 const MIN_ROOM_SIZE_METERS = 0.5
 const EPSILON = 0.001
-
-const FURNITURE_LIBRARY = [
-  {
-    id: 'compact-sofa',
-    name: 'Compact Sofa',
-    width: 1.8,
-    height: 0.85,
-    length: 0.9,
-    thumbnail:
-      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=800&q=80',
-    modelUrl:
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxTextured/glTF-Binary/BoxTextured.glb',
-  },
-  {
-    id: 'dining-table',
-    name: 'Dining Table',
-    width: 1.4,
-    height: 0.75,
-    length: 0.8,
-    thumbnail:
-      'https://images.unsplash.com/photo-1617098474202-0d0d7f60f3f4?auto=format&fit=crop&w=800&q=80',
-    modelUrl:
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF-Binary/Box.glb',
-  },
-  {
-    id: 'storage-cabinet',
-    name: 'Storage Cabinet',
-    width: 0.9,
-    height: 1.9,
-    length: 0.45,
-    thumbnail:
-      'https://images.unsplash.com/photo-1604578762246-41134e37f9cc?auto=format&fit=crop&w=800&q=80',
-    modelUrl:
-      'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxTextured/glTF-Binary/BoxTextured.glb',
-  },
-]
 
 function parsePositiveNumber(value) {
   const parsedValue = Number.parseFloat(value)
@@ -79,7 +52,21 @@ function formatMeters(value) {
   })
 }
 
-function VirtualRoomPlannerSection() {
+function VirtualRoomPlannerSection({ products = [] }) {
+  const furnitureLibrary = useMemo(() => {
+    return products
+      .filter((product) => product.modelUrl)
+      .map((product) => ({
+        id: product.id,
+        name: product.name,
+        width: product.widthM,
+        length: product.lengthM,
+        height: product.heightM,
+        thumbnail: product.image,
+        modelUrl: product.modelUrl,
+      }))
+  }, [products])
+
   const [roomForm, setRoomForm] = useState({
     width: '4',
     length: '5',
@@ -812,7 +799,7 @@ function VirtualRoomPlannerSection() {
               </div>
 
               <div className="mt-4 space-y-3">
-                {FURNITURE_LIBRARY.map((item) => (
+                {furnitureLibrary.map((item) => (
                   <article key={item.id} className="rounded-xl border border-primary/10 p-3">
                     <div className="aspect-[4/3] overflow-hidden rounded-lg bg-background-light">
                       <img alt={item.name} className="h-full w-full object-cover" src={item.thumbnail} />

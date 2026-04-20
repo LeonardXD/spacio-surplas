@@ -1069,7 +1069,7 @@ function App() {
     }
 
     if (resolvedView === 'planner') {
-      return <VirtualRoomPlannerSection />
+      return <VirtualRoomPlannerSection products={marketplaceProducts} />
     }
 
     if (resolvedView === 'cart') {
